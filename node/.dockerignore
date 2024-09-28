@@ -1,0 +1,22 @@
+# Ignore node_modules everywhere
+**/node_modules
+
+# Ignore development and git files
+.git
+.gitignore
+*.log
+*.md
+.vscode
+
+# Ignore build outputs
+**/dist
+**/build
+
+# Don't ignore package.json and pnpm files
+!**/package.json
+!pnpm-workspace.yaml
+!pnpm-lock.yaml
+
+# Ignore local env files
+.env
+.env.*

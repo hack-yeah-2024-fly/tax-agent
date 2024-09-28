@@ -1,0 +1,47 @@
+# Use Node.js as the base image
+FROM node:20-alpine AS base
+
+# Install pnpm
+RUN npm install -g pnpm@9.1.0
+
+# Set working directory
+WORKDIR /app
+
+# Copy package.json files and workspace configuration
+COPY package.json pnpm-workspace.yaml ./
+COPY apps/server/package.json ./apps/server/
+COPY apps/browser-app/package.json ./apps/browser-app/
+COPY packages/eslint-config/package.json ./packages/eslint-config/
+COPY packages/typescript-config/package.json ./packages/typescript-config/
+COPY packages/ui/package.json ./packages/ui/
+
+# Install dependencies
+RUN pnpm install --no-frozen-lockfile
+
+# Copy the rest of the application code
+COPY . .
+
+# Build the server
+FROM base AS server-builder
+WORKDIR /app/apps/server
+RUN pnpm run build
+
+# Build the browser app
+FROM base AS browser-app-builder
+WORKDIR /app/apps/browser-app
+RUN pnpm run build
+
+# Create the final server image
+FROM node:20-alpine AS server
+WORKDIR /app
+COPY --from=server-builder /app/apps/server/dist ./dist
+COPY --from=server-builder /app/apps/server/package.json .
+RUN npm install --production --legacy-peer-deps
+EXPOSE 4000
+CMD ["node", "dist/index.js"]
+
+# Create the final browser app image
+FROM nginx:alpine AS browser-app
+COPY --from=browser-app-builder /app/apps/browser-app/dist /usr/share/nginx/html
+COPY apps/browser-app/nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
