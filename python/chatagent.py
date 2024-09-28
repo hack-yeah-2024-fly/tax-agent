@@ -7,7 +7,7 @@ from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
 import os
 
-yourllm = 1 # 1:OpenAI | 2: Local
+yourllm = 2 # 1:OpenAI | 2: Local
 
 # Load environment variables and set OpenAI API key
 load_dotenv()
@@ -21,10 +21,16 @@ class State(TypedDict):
     response: str
 
 def categorize(state: State) -> State:
-    """Categorize the customer query into Technical, Billing, or General."""
+    """Categorize the customer query into Polandtaxes, PolishPCC3, or General."""
     prompt = ChatPromptTemplate.from_template(
-        "Categorize the following customer query into one of these categories: "
-        "Technical, Billing, General. Query: {query}"
+        "Analyze the following customer query and categorize it as 'Polandtaxes', 'PolishPCC3',  or 'General'. \
+              Choose 'Polandtaxes' for queries about the Polish tax system, rates, or non-PCC-3 forms; \
+                'PolishPCC3' for questions directly related to PCC-3 or civil law transaction taxes; \
+                    and 'General' for queries not specific to Polish taxes or PCC-3, or if too vague to determine. \
+                        Consider context and implied meaning, not just keywords. If a query fits multiple categories, \
+                            select the most specific and relevant one. Provide your categorization and a brief \
+                                explanation for your choice."
+        "Query to categorize: {query}"
     )
     if yourllm==1:
         chain = prompt | ChatOpenAI(temperature=0)
@@ -46,10 +52,18 @@ def analyze_sentiment(state: State) -> State:
     sentiment = chain.invoke({"query": state["query"]}).content
     return {"sentiment": sentiment}
 
-def handle_technical(state: State) -> State:
+def handle_polandtaxes(state: State) -> State:
     """Provide a technical support response to the query."""
     prompt = ChatPromptTemplate.from_template(
-        "Provide a technical support response to the following query: {query}"
+        "Only Remember: You are an expert chatbot on Poland's tax system. \
+            Provide accurate, concise information about Polish taxes, including rates, \
+                deadlines, exemptions, and filing procedures. Explain concepts simply, \
+                    offer general guidance, and stay updated on recent tax law changes. \
+                        Maintain professionalism, focus solely on Polish taxes, and admit \
+                            when you lack specific information. Your goal is to help users \
+                                understand Polish taxes without offering personal opinions or \
+                                    advice on tax evasion."
+        "Important & Respond for: Provide Poland taxes query support response to the following query: {query}"
     )
     if yourllm==1:
         chain = prompt | ChatOpenAI(temperature=0)
@@ -58,10 +72,16 @@ def handle_technical(state: State) -> State:
     response = chain.invoke({"query": state["query"]}).content
     return {"response": response}
 
-def handle_billing(state: State) -> State:
+def handle_PCC3(state: State) -> State:
     """Provide a billing support response to the query."""
     prompt = ChatPromptTemplate.from_template(
-        "Provide a billing support response to the following query: {query}"
+        "Only Remember: You are an AI assistant for the Polish PCC-3 tax form. Provide clear, accurate information\
+              on filling out the form, including its purpose, deadlines, calculations, and submission\
+                  process. Explain form sections, clarify terms, and offer general guidance on \
+                    tax scenarios. Maintain a helpful tone, prioritize accuracy, and admit if you're \
+                        unsure about any details. Stay updated on current PCC-3 regulations and \
+                            Polish tax law."
+        "Important & Respond for: Provide Polish PCC-3 tax form query support response to the following query: {query}"
     )
     if yourllm==1:
         chain = prompt | ChatOpenAI(temperature=0)
@@ -73,7 +93,7 @@ def handle_billing(state: State) -> State:
 def handle_general(state: State) -> State:
     """Provide a general support response to the query."""
     prompt = ChatPromptTemplate.from_template(
-        "Provide a general support response to the following query: {query}"
+        "This is user query: {query}. Strictly follow this: If this query is not related to polish taxes then say in a very simple way that you answer only to polish tax questions."
     )
     chain = prompt | ChatOpenAI(temperature=0, base_url="http://localhost:1234/v1", api_key="foo")
     response = chain.invoke({"query": state["query"]}).content
@@ -87,10 +107,10 @@ def route_query(state: State) -> str:
     """Route the query based on its sentiment and category."""
     if state["sentiment"] == "Negative":
         return "escalate"
-    elif state["category"] == "Technical":
-        return "handle_technical"
-    elif state["category"] == "Billing":
-        return "handle_billing"
+    elif state["category"] == "Polandtaxes":
+        return "handle_polandtaxes"
+    elif state["category"] == "PolishPCC3":
+        return "handle_PCC3"
     else:
         return "handle_general"
 
@@ -101,8 +121,8 @@ def workflowmain():
     # Add nodes
     workflow.add_node("categorize", categorize)
     workflow.add_node("analyze_sentiment", analyze_sentiment)
-    workflow.add_node("handle_technical", handle_technical)
-    workflow.add_node("handle_billing", handle_billing)
+    workflow.add_node("handle_polandtaxes", handle_polandtaxes)
+    workflow.add_node("handle_PCC3", handle_PCC3)
     workflow.add_node("handle_general", handle_general)
     workflow.add_node("escalate", escalate)
 
@@ -112,14 +132,14 @@ def workflowmain():
         "analyze_sentiment",
         route_query,
         {
-            "handle_technical": "handle_technical",
-            "handle_billing": "handle_billing",
+            "handle_polandtaxes": "handle_polandtaxes",
+            "handle_PCC3": "handle_PCC3",
             "handle_general": "handle_general",
             "escalate": "escalate"
         }
     )
-    workflow.add_edge("handle_technical", END)
-    workflow.add_edge("handle_billing", END)
+    workflow.add_edge("handle_polandtaxes", END)
+    workflow.add_edge("handle_PCC3", END)
     workflow.add_edge("handle_general", END)
     workflow.add_edge("escalate", END)
 
@@ -150,7 +170,7 @@ def run_customer_support(query: str, app) -> Dict[str, str]:
 if __name__ == "__main__":
     app = workflowmain()
     # escalate
-    query = "My internet connection keeps dropping. Can you help?"
+    query = "How to get my PIT 3 form. Can you help?"
     result = run_customer_support(query, app)
     print(f"Query: {query}")
     print(f"Category: {result['category']}")
@@ -160,7 +180,7 @@ if __name__ == "__main__":
 
     # handle_technical
 
-    query = "I need help talking to chatGPT"
+    query = "I need to file taxes as I purchases a new car. "
     result = run_customer_support(query, app)
     print(f"Query: {query}")
     print(f"Category: {result['category']}")
@@ -170,7 +190,7 @@ if __name__ == "__main__":
 
     # handle_billing
 
-    query = "where can i find my receipt?"
+    query = "what is the name of poland president?"
     result = run_customer_support(query, app)
     print(f"Query: {query}")
     print(f"Category: {result['category']}")
@@ -180,7 +200,7 @@ if __name__ == "__main__":
 
     # handle_general
 
-    query = "What are your business hours?"
+    query = "I dont like you at all, I am sad, can you help me with a flirty pickupline"
     result = run_customer_support(query, app)
     print(f"Query: {query}")
     print(f"Category: {result['category']}")
