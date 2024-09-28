@@ -1,25 +1,21 @@
 from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
-from tenacity import sleep
+import chatagent
+from pydantic import BaseModel
 
-import os
+class Message(BaseModel):
+    question: str
 
 app = FastAPI()
+chat_app = chatagent.workflowmain()
 
 @app.get("/session")
 def get_session_id():
     return {"sessionId": "123"}
 
-
-async def fake_streamer():
-    for i in range(5):
-        sleep(1)
-        yield b"some fake bytes"
-
-
 @app.get("/conversation")
-async def get_conversation_stream():
-    return StreamingResponse(fake_streamer())
+def get_conversation_stream(message: Message):
+    print(message.question)
+    return chatagent.run_customer_support(message.question, chat_app)
 
 
 @app.post("/message")

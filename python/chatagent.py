@@ -7,12 +7,12 @@ from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
 import os
 
-yourllm = 2 # 1:OpenAI | 2: Local
+yourllm = 1 # 1:OpenAI | 2: Local
 
 # Load environment variables and set OpenAI API key
 load_dotenv()
 if yourllm==1:
-    os.environ["OPENAI_API_KEY"] = os.getenv('OPENAI_API_KEY')
+    os.environ["OPENAI_API_KEY"] = os.environ.get("OPEN_AI_API_KEY")
 
 class State(TypedDict):
     query: str
