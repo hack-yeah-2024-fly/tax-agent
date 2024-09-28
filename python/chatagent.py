@@ -7,7 +7,7 @@ import asyncio
 
 load_dotenv()
 yourllm = 1 # 1:OpenAI | 2: Local
-OPENAI_API_KEY = "sk-s4hLsgYHujAdrdjgukqlXaBaYXB1EiFXkSQUQk1bjzT3BlbkFJoYmYfBkpx7L_RaIgbFJt6ka0gnNSR5bWSojwwR_ksA"
+OPENAI_API_KEY = "Keep The Key"
 
 
 class State(TypedDict):
