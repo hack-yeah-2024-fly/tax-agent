@@ -10,15 +10,6 @@ services:
     environment:
       - PORT=4000
 
-  browser-app:
-    build:
-      context: .
-      target: browser-app
-    ports:
-      - "80:80"
-    depends_on:
-      - server
-
 networks:
   default:
     name: tax-agent-network

@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  browser-app:
+    build:
+      context: ./node
+      target: browser-app
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+
+  python-app:
+    build:
+      context: ./python
+      target: python-app
+    ports:
+      - "8081:8081"
+
+networks:
+  default:
+    name: tax-agent-network

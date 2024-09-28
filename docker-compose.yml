@@ -1,15 +1,6 @@
 version: "3.8"
 
 services:
-  server:
-    build:
-      context: ./node
-      target: server
-    ports:
-      - "4000:4000"
-    environment:
-      - PORT=4000
-
   browser-app:
     build:
       context: ./node
@@ -17,7 +8,7 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - server
+      - python-app
 
   python-app:
     build:
