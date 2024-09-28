@@ -1,11 +1,18 @@
-from fastapi import FastAPI
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from fastapi import FastAPI, Query
+from fastapi.responses import StreamingResponse
 import chatagent
 from pydantic import BaseModel
+import json
 
 class Message(BaseModel):
     question: str
 
 app = FastAPI()
+
 chat_app = chatagent.workflowmain()
 
 @app.get("/session")
@@ -13,10 +20,11 @@ def get_session_id():
     return {"sessionId": "123"}
 
 @app.get("/conversation")
-def get_conversation_stream(message: Message):
-    print(message.question)
-    return chatagent.run_customer_support(message.question, chat_app)
-
+async def get_conversation_stream(question: str = Query(..., description="The user's question")):
+    print(f"Received question: {question}")
+    result = await chatagent.run_customer_support(question, chat_app)
+    print(result)
+    return {"response": result}
 
 @app.post("/message")
 def send_message():

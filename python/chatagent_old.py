@@ -1,23 +1,24 @@
-from typing import Dict, TypedDict, AsyncGenerator
+# https://github.com/NirDiamant/GenAI_Agents/blob/main/all_agents_tutorials/customer_support_agent_langgraph.ipynb
+# Requirements : langgraph langchain-core langchain-openai python-dotenv
+from typing import Dict, TypedDict
 from langgraph.graph import StateGraph, END
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
-import asyncio
+import os
 
-load_dotenv()
 yourllm = 1 # 1:OpenAI | 2: Local
-OPENAI_API_KEY = "sk-s4hLsgYHujAdrdjgukqlXaBaYXB1EiFXkSQUQk1bjzT3BlbkFJoYmYfBkpx7L_RaIgbFJt6ka0gnNSR5bWSojwwR_ksA"
 
+# Load environment variables and set OpenAI API key
+load_dotenv()
+if yourllm==1:
+    os.environ["OPENAI_API_KEY"] = os.environ.get("OPEN_AI_API_KEY")
 
 class State(TypedDict):
     query: str
     category: str
     sentiment: str
     response: str
-
-def get_openai_model():
-    return ChatOpenAI(temperature=0, api_key=OPENAI_API_KEY)
 
 def categorize(state: State) -> State:
     """Categorize the customer query into Polandtaxes, PolishPCC3, or General."""
@@ -32,7 +33,7 @@ def categorize(state: State) -> State:
         "Query to categorize: {query}"
     )
     if yourllm==1:
-        chain = prompt | get_openai_model()
+        chain = prompt | ChatOpenAI(temperature=0)
     else:
         chain = prompt | ChatOpenAI(temperature=0, base_url="http://localhost:1234/v1", api_key="foo")
     category = chain.invoke({"query": state["query"]}).content
@@ -45,7 +46,7 @@ def analyze_sentiment(state: State) -> State:
         "Respond with either 'Positive', 'Neutral', or 'Negative'. Query: {query}"
     )
     if yourllm==1:
-        chain = prompt | get_openai_model()
+        chain = prompt | ChatOpenAI(temperature=0)
     else:
         chain = prompt | ChatOpenAI(temperature=0, base_url="http://localhost:1234/v1", api_key="foo")
     sentiment = chain.invoke({"query": state["query"]}).content
@@ -65,7 +66,7 @@ def handle_polandtaxes(state: State) -> State:
         "Important & Respond for: Provide Poland taxes query support response to the following query: {query}"
     )
     if yourllm==1:
-        chain = prompt | get_openai_model()
+        chain = prompt | ChatOpenAI(temperature=0)
     else:
         chain = prompt | ChatOpenAI(temperature=0, base_url="http://localhost:1234/v1", api_key="foo")
     response = chain.invoke({"query": state["query"]}).content
@@ -83,7 +84,7 @@ def handle_PCC3(state: State) -> State:
         "Important & Respond for: Provide Polish PCC-3 tax form query support response to the following query: {query}"
     )
     if yourllm==1:
-        chain = prompt | get_openai_model()
+        chain = prompt | ChatOpenAI(temperature=0)
     else:
         chain = prompt | ChatOpenAI(temperature=0, base_url="http://localhost:1234/v1", api_key="foo")
     response = chain.invoke({"query": state["query"]}).content
@@ -94,10 +95,7 @@ def handle_general(state: State) -> State:
     prompt = ChatPromptTemplate.from_template(
         "This is user query: {query}. Strictly follow this: If this query is not related to polish taxes then say in a very simple way that you answer only to polish tax questions."
     )
-    if yourllm==1:
-        chain = prompt | get_openai_model()
-    else:
-        chain = prompt | ChatOpenAI(temperature=0, base_url="http://localhost:1234/v1", api_key="foo")
+    chain = prompt | ChatOpenAI(temperature=0, base_url="http://localhost:1234/v1", api_key="foo")
     response = chain.invoke({"query": state["query"]}).content
     return {"response": response}
 
@@ -117,8 +115,9 @@ def route_query(state: State) -> str:
         return "handle_general"
 
 def workflowmain():
+    # Create the graph
     workflow = StateGraph(State)
-    
+
     # Add nodes
     workflow.add_node("categorize", categorize)
     workflow.add_node("analyze_sentiment", analyze_sentiment)
@@ -126,7 +125,7 @@ def workflowmain():
     workflow.add_node("handle_PCC3", handle_PCC3)
     workflow.add_node("handle_general", handle_general)
     workflow.add_node("escalate", escalate)
-    
+
     # Add edges
     workflow.add_edge("categorize", "analyze_sentiment")
     workflow.add_conditional_edges(
@@ -139,36 +138,39 @@ def workflowmain():
             "escalate": "escalate"
         }
     )
-    
     workflow.add_edge("handle_polandtaxes", END)
     workflow.add_edge("handle_PCC3", END)
     workflow.add_edge("handle_general", END)
     workflow.add_edge("escalate", END)
-    
+
+    # Set entry point
     workflow.set_entry_point("categorize")
-    
+
+    # Compile the graph
     app = workflow.compile()
     return app
 
-async def run_customer_support(query: str, app) -> str:
-    """Process a customer query through the LangGraph workflow."""
-    results = await app.ainvoke({"query": query})
-    
-    # Print category and sentiment internally
-    print(f"Query: {query}")
-    print(f"Category: {results['category']}")
-    print(f"Sentiment: {results['sentiment']}")
-    print(f"Response: {results['response']}")
-    
-    # Return only the response
-    return results["response"]
 
-# Keep the app instance running
-#app = asyncio.run(workflowmain())
+def run_customer_support(query: str, app) -> Dict[str, str]:
+    """Process a customer query through the LangGraph workflow.
+    
+    Args:
+        query (str): The customer's query
+        
+    Returns:
+        Dict[str, str]: A dictionary containing the query's category, sentiment, and response
+    """
+    results = app.invoke({"query": query})
+    return {
+        "category": results["category"],
+        "sentiment": results["sentiment"],
+        "response": results["response"]
+    }
 
+# The below code is for testing purpose
 if __name__ == "__main__":
     app = workflowmain()
-
+    # escalate
     query = "How to get my PIT 3 form. Can you help?"
     result = run_customer_support(query, app)
     print(f"Query: {query}")
@@ -176,3 +178,32 @@ if __name__ == "__main__":
     print(f"Sentiment: {result['sentiment']}")
     print(f"Response: {result['response']}")
     print("\n")
+
+    # handle_technical
+
+    query = "I need to file taxes as I purchases a new car. "
+    result = run_customer_support(query, app)
+    print(f"Query: {query}")
+    print(f"Category: {result['category']}")
+    print(f"Sentiment: {result['sentiment']}")
+    print(f"Response: {result['response']}")
+    print("\n")
+
+    # handle_billing
+
+    query = "what is the name of poland president?"
+    result = run_customer_support(query, app)
+    print(f"Query: {query}")
+    print(f"Category: {result['category']}")
+    print(f"Sentiment: {result['sentiment']}")
+    print(f"Response: {result['response']}")
+    print("\n")
+
+    # handle_general
+
+    query = "I dont like you at all, I am sad, can you help me with a flirty pickupline"
+    result = run_customer_support(query, app)
+    print(f"Query: {query}")
+    print(f"Category: {result['category']}")
+    print(f"Sentiment: {result['sentiment']}")
+    print(f"Response: {result['response']}")
