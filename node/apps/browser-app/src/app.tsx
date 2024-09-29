@@ -4,10 +4,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
 import { Main } from "./features/shell/components/main";
-import ChatPage from "./pages/chat/chat.page";
 import LoginPage from "./pages/login/login.page";
 import Orders from "./features/orders/orders";
 import MyProfile from "./features/form/components/MyProfile";
+import { MainPage } from "./pages/main";
 
 const router = createBrowserRouter([
   {
@@ -16,11 +16,7 @@ const router = createBrowserRouter([
     children: [
       {
         path: "/",
-        element: <div>Home</div>,
-      },
-      {
-        path: "/chat",
-        element: <ChatPage />,
+        element: <MainPage />,
       },
       {
         path: "/orders",
