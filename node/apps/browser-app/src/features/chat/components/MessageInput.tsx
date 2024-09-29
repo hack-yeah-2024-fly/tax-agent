@@ -1,15 +1,11 @@
-import * as React from 'react';
-import Box from '@mui/joy/Box';
-import Button from '@mui/joy/Button';
-import FormControl from '@mui/joy/FormControl';
-import Textarea from '@mui/joy/Textarea';
-import { IconButton, Stack } from '@mui/joy';
+import { Stack } from "@mui/joy";
+import Box from "@mui/joy/Box";
+import Button from "@mui/joy/Button";
+import FormControl from "@mui/joy/FormControl";
+import Textarea from "@mui/joy/Textarea";
+import * as React from "react";
 
-import FormatBoldRoundedIcon from '@mui/icons-material/FormatBoldRounded';
-import FormatItalicRoundedIcon from '@mui/icons-material/FormatItalicRounded';
-import StrikethroughSRoundedIcon from '@mui/icons-material/StrikethroughSRounded';
-import FormatListBulletedRoundedIcon from '@mui/icons-material/FormatListBulletedRounded';
-import SendRoundedIcon from '@mui/icons-material/SendRounded';
+import SendRoundedIcon from "@mui/icons-material/SendRounded";
 
 export type MessageInputProps = {
   textAreaValue: string;
@@ -21,16 +17,16 @@ export default function MessageInput(props: MessageInputProps) {
   const { textAreaValue, setTextAreaValue, onSubmit } = props;
   const textAreaRef = React.useRef<HTMLDivElement>(null);
   const handleClick = () => {
-    if (textAreaValue.trim() !== '') {
+    if (textAreaValue.trim() !== "") {
       onSubmit();
-      setTextAreaValue('');
+      setTextAreaValue("");
     }
   };
   return (
     <Box sx={{ px: 2, pb: 3 }}>
       <FormControl>
         <Textarea
-          placeholder="Type something here…"
+          placeholder="Wpisz swoją wiadomość..."
           aria-label="Message"
           ref={textAreaRef}
           onChange={(e) => {
@@ -43,47 +39,34 @@ export default function MessageInput(props: MessageInputProps) {
             <Stack
               direction="row"
               sx={{
-                justifyContent: 'space-between',
-                alignItems: 'center',
+                justifyContent: "space-between",
+                alignItems: "center",
                 flexGrow: 1,
                 py: 1,
                 pr: 1,
-                borderTop: '1px solid',
-                borderColor: 'divider',
+                borderTop: "1px solid",
+                borderColor: "divider",
               }}
             >
-              <div>
-                <IconButton size="sm" variant="plain" color="neutral">
-                  <FormatBoldRoundedIcon />
-                </IconButton>
-                <IconButton size="sm" variant="plain" color="neutral">
-                  <FormatItalicRoundedIcon />
-                </IconButton>
-                <IconButton size="sm" variant="plain" color="neutral">
-                  <StrikethroughSRoundedIcon />
-                </IconButton>
-                <IconButton size="sm" variant="plain" color="neutral">
-                  <FormatListBulletedRoundedIcon />
-                </IconButton>
-              </div>
+              <div></div>
               <Button
                 size="sm"
                 color="primary"
-                sx={{ alignSelf: 'center', borderRadius: 'sm' }}
+                sx={{ alignSelf: "center", borderRadius: "sm" }}
                 endDecorator={<SendRoundedIcon />}
                 onClick={handleClick}
               >
-                Send
+                Wyślij
               </Button>
             </Stack>
           }
           onKeyDown={(event) => {
-            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
               handleClick();
             }
           }}
           sx={{
-            '& textarea:first-of-type': {
+            "& textarea:first-of-type": {
               minHeight: 72,
             },
           }}

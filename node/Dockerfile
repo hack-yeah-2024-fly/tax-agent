@@ -9,7 +9,6 @@ WORKDIR /app
 
 # Copy package.json files and workspace configuration
 COPY package.json pnpm-workspace.yaml ./
-COPY apps/server/package.json ./apps/server/
 COPY apps/browser-app/package.json ./apps/browser-app/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
@@ -21,24 +20,10 @@ RUN pnpm install --no-frozen-lockfile
 # Copy the rest of the application code
 COPY . .
 
-# Build the server
-FROM base AS server-builder
-WORKDIR /app/apps/server
-RUN pnpm run build
-
 # Build the browser app
 FROM base AS browser-app-builder
 WORKDIR /app/apps/browser-app
 RUN pnpm run build
-
-# Create the final server image
-FROM node:20-alpine AS server
-WORKDIR /app
-COPY --from=server-builder /app/apps/server/dist ./dist
-COPY --from=server-builder /app/apps/server/package.json .
-RUN npm install --production --legacy-peer-deps
-EXPOSE 4000
-CMD ["node", "dist/index.js"]
 
 # Create the final browser app image
 FROM nginx:alpine AS browser-app
