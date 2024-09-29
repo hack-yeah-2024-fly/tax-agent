@@ -2,22 +2,40 @@ from typing import Dict, TypedDict, AsyncGenerator
 from langgraph.graph import StateGraph, END
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from langchain_community.chat_models import ChatPerplexity
 from dotenv import load_dotenv
 import asyncio
 
 load_dotenv()
-yourllm = 1 # 1:OpenAI | 2: Local
+yourllm = 2 # 1:OpenAI | 2: Perplexity  | 3: Local
 OPENAI_API_KEY = "Keep The Key"
-
+PERPLEXITY_API_KEY = "Keep The Key"
 
 class State(TypedDict):
     query: str
     category: str
     sentiment: str
     response: str
+    mode: str
 
 def get_openai_model():
     return ChatOpenAI(temperature=0, api_key=OPENAI_API_KEY)
+
+def get_perplexity_model():
+    return ChatPerplexity(
+            model="llama-3.1-sonar-small-128k-online",
+            temperature=0.4,
+            api_key=PERPLEXITY_API_KEY,
+            stream=False,
+        )
+
+def get_perplexity_model2():
+    return ChatPerplexity(
+            model="llama-3.1-sonar-small-128k-online",
+            temperature=0.4,
+            api_key=PERPLEXITY_API_KEY,
+            stream=True,
+        )
 
 def categorize(state: State) -> State:
     """Categorize the customer query into Polandtaxes, PolishPCC3, or General."""
@@ -33,6 +51,8 @@ def categorize(state: State) -> State:
     )
     if yourllm==1:
         chain = prompt | get_openai_model()
+    elif yourllm==2:
+        chain = prompt | get_perplexity_model()
     else:
         chain = prompt | ChatOpenAI(temperature=0, base_url="http://localhost:1234/v1", api_key="foo")
     category = chain.invoke({"query": state["query"]}).content
@@ -46,6 +66,8 @@ def analyze_sentiment(state: State) -> State:
     )
     if yourllm==1:
         chain = prompt | get_openai_model()
+    elif yourllm==2:
+        chain = prompt | get_perplexity_model()
     else:
         chain = prompt | ChatOpenAI(temperature=0, base_url="http://localhost:1234/v1", api_key="foo")
     sentiment = chain.invoke({"query": state["query"]}).content
@@ -66,6 +88,8 @@ def handle_polandtaxes(state: State) -> State:
     )
     if yourllm==1:
         chain = prompt | get_openai_model()
+    elif yourllm==2:
+        chain = prompt | get_perplexity_model()
     else:
         chain = prompt | ChatOpenAI(temperature=0, base_url="http://localhost:1234/v1", api_key="foo")
     response = chain.invoke({"query": state["query"]}).content
@@ -74,16 +98,15 @@ def handle_polandtaxes(state: State) -> State:
 def handle_PCC3(state: State) -> State:
     """Provide a billing support response to the query."""
     prompt = ChatPromptTemplate.from_template(
-        "Only Remember: You are an AI assistant for the Polish PCC-3 tax form. Provide clear, accurate information\
-              on filling out the form, including its purpose, deadlines, calculations, and submission\
-                  process. Explain form sections, clarify terms, and offer general guidance on \
-                    tax scenarios. Maintain a helpful tone, prioritize accuracy, and admit if you're \
-                        unsure about any details. Stay updated on current PCC-3 regulations and \
-                            Polish tax law."
-        "Important & Respond for: Provide Polish PCC-3 tax form query support response to the following query: {query}"
+        "Note: You are an AI assistant for the Polish PCC-3 tax form. Provide information\
+              on filling out the form, perform precise calculations based on different category and its percentages,\
+                Stay updated on current PCC-3 regulations and Polish tax law."
+        "Use above Note and Provide response to the following query: {query}"
     )
     if yourllm==1:
         chain = prompt | get_openai_model()
+    elif yourllm==2:
+        chain = prompt | get_perplexity_model2()
     else:
         chain = prompt | ChatOpenAI(temperature=0, base_url="http://localhost:1234/v1", api_key="foo")
     response = chain.invoke({"query": state["query"]}).content
@@ -96,6 +119,8 @@ def handle_general(state: State) -> State:
     )
     if yourllm==1:
         chain = prompt | get_openai_model()
+    elif yourllm==2:
+        chain = prompt | get_perplexity_model()
     else:
         chain = prompt | ChatOpenAI(temperature=0, base_url="http://localhost:1234/v1", api_key="foo")
     response = chain.invoke({"query": state["query"]}).content
@@ -106,6 +131,15 @@ def escalate(state: State) -> State:
     return {"response": "This query has been escalated to a human agent due to its negative sentiment."}
 
 def route_query(state: State) -> str:
+    """Route the query based on its sentiment and category."""
+    if state["category"] == "Polandtaxes":
+        return "handle_polandtaxes"
+    elif state["category"] == "PolishPCC3":
+        return "handle_PCC3"
+    else:
+        return "handle_PCC3"
+    
+def route_query_backup(state: State) -> str:
     """Route the query based on its sentiment and category."""
     if state["sentiment"] == "Negative":
         return "escalate"
@@ -121,16 +155,16 @@ def workflowmain():
     
     # Add nodes
     workflow.add_node("categorize", categorize)
-    workflow.add_node("analyze_sentiment", analyze_sentiment)
+    #workflow.add_node("analyze_sentiment", analyze_sentiment)
     workflow.add_node("handle_polandtaxes", handle_polandtaxes)
     workflow.add_node("handle_PCC3", handle_PCC3)
     workflow.add_node("handle_general", handle_general)
     workflow.add_node("escalate", escalate)
     
     # Add edges
-    workflow.add_edge("categorize", "analyze_sentiment")
+    #workflow.add_edge("categorize", "analyze_sentiment")
     workflow.add_conditional_edges(
-        "analyze_sentiment",
+        "categorize",
         route_query,
         {
             "handle_polandtaxes": "handle_polandtaxes",
@@ -157,7 +191,7 @@ async def run_customer_support(query: str, app) -> str:
     # Print category and sentiment internally
     print(f"Query: {query}")
     print(f"Category: {results['category']}")
-    print(f"Sentiment: {results['sentiment']}")
+    #print(f"Sentiment: {results['sentiment']}")
     print(f"Response: {results['response']}")
     
     # Return only the response
@@ -165,14 +199,14 @@ async def run_customer_support(query: str, app) -> str:
 
 # Keep the app instance running
 #app = asyncio.run(workflowmain())
-
-if __name__ == "__main__":
+async def main():
     app = workflowmain()
 
-    query = "How to get my PIT 3 form. Can you help?"
-    result = run_customer_support(query, app)
+    query = "I have borrowed PLN 21,000 from my friend asha to renovate my flat. (PCC-3)"
+    result = await run_customer_support(query, app)
     print(f"Query: {query}")
-    print(f"Category: {result['category']}")
-    print(f"Sentiment: {result['sentiment']}")
-    print(f"Response: {result['response']}")
+    print(result)
     print("\n")
+
+if __name__ == "__main__":
+    asyncio.run(main())
