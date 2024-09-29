@@ -1,0 +1,35 @@
+{
+    "title": "Polish Tax Knowledge Base",
+    "description": "Knowledge base for Polish tax information",
+    "language": "pl",
+    "supp_id": "",
+    "created_on": 1727598894,
+    "components": {
+        "embedding_model": {
+            "subclass_name": "OllamaEmbedding",
+            "dimension": 768,
+            "model": "snowflake-arctic-embed:335m"
+        },
+        "reranker": {
+            "subclass_name": "NoReranker",
+            "ignore_absolute_relevance": false
+        },
+        "auto_context_model": {
+            "subclass_name": "OpenAIChatAPI",
+            "model": "gpt-4o-mini",
+            "temperature": 0.5,
+            "max_tokens": 1000
+        },
+        "vector_db": {
+            "subclass_name": "BasicVectorDB",
+            "kb_id": "polish_tax_kb",
+            "storage_directory": "./polish_tax_kb",
+            "use_faiss": true
+        },
+        "chunk_db": {
+            "subclass_name": "BasicChunkDB",
+            "kb_id": "polish_tax_kb",
+            "storage_directory": "./polish_tax_kb"
+        }
+    }
+}

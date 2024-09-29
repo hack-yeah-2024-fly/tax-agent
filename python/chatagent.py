@@ -3,6 +3,9 @@ from langgraph.graph import StateGraph, END
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatPerplexity
+from typing import List, Tuple
+from langchain.schema import Document
+from advanced_retriever import AdvancedRetriever
 from dotenv import load_dotenv
 import asyncio
 
@@ -11,12 +14,16 @@ yourllm = 2 # 1:OpenAI | 2: Perplexity  | 3: Local
 OPENAI_API_KEY = "Keep The Key"
 PERPLEXITY_API_KEY = "Keep The Key"
 
+#intializing the retriver
+retriever = AdvancedRetriever(OPENAI_API_KEY)
+
 class State(TypedDict):
     query: str
     category: str
     sentiment: str
     response: str
     mode: str
+    pre_response: str
 
 def get_openai_model():
     return ChatOpenAI(temperature=0, api_key=OPENAI_API_KEY)
@@ -36,6 +43,11 @@ def get_perplexity_model2():
             api_key=PERPLEXITY_API_KEY,
             stream=True,
         )
+
+# Add a new function to retrieve documents
+async def retrieve_documents(state: State) -> State:
+    pre_response = await retriever.retrieve_and_process(state["query"])
+    return {"pre_response": pre_response}
 
 def categorize(state: State) -> State:
     """Categorize the customer query into Polandtaxes, PolishPCC3, or General."""
@@ -96,20 +108,23 @@ def handle_polandtaxes(state: State) -> State:
     return {"response": response}
 
 def handle_PCC3(state: State) -> State:
-    """Provide a billing support response to the query."""
     prompt = ChatPromptTemplate.from_template(
-        "Note: You are an AI assistant for the Polish PCC-3 tax form. Provide information\
-              on filling out the form, perform precise calculations based on different category and its percentages,\
-                Stay updated on current PCC-3 regulations and Polish tax law."
-        "Use above Note and Provide response to the following query: {query}"
+        "You are an AI assistant for the Polish PCC-3 tax form. Use the following pre-processed information "
+        "and the original query to provide a detailed response. If the pre-processed information is not directly "
+        "relevant, focus on answering the query based on your knowledge of PCC-3 regulations.\n\n"
+        "Pre-processed information: {pre_response}\n\n"
+        "Original query: {query}\n\n"
+        "Provide a detailed response:"
     )
-    if yourllm==1:
+
+    if yourllm == 1:
         chain = prompt | get_openai_model()
-    elif yourllm==2:
+    elif yourllm == 2:
         chain = prompt | get_perplexity_model2()
     else:
         chain = prompt | ChatOpenAI(temperature=0, base_url="http://localhost:1234/v1", api_key="foo")
-    response = chain.invoke({"query": state["query"]}).content
+    
+    response = chain.invoke({"query": state["query"], "pre_response": state["pre_response"]}).content
     return {"response": response}
 
 def handle_general(state: State) -> State:
@@ -135,54 +150,42 @@ def route_query(state: State) -> str:
     if state["category"] == "Polandtaxes":
         return "handle_polandtaxes"
     elif state["category"] == "PolishPCC3":
-        return "handle_PCC3"
-    else:
-        return "handle_PCC3"
-    
-def route_query_backup(state: State) -> str:
-    """Route the query based on its sentiment and category."""
-    if state["sentiment"] == "Negative":
-        return "escalate"
-    elif state["category"] == "Polandtaxes":
-        return "handle_polandtaxes"
-    elif state["category"] == "PolishPCC3":
-        return "handle_PCC3"
-    else:
+        return "retrieve_documents"
+    elif state["category"] == "General":
         return "handle_general"
+    else:
+        return "retrieve_documents"
 
 def workflowmain():
     workflow = StateGraph(State)
-    
-    # Add nodes
+
     workflow.add_node("categorize", categorize)
-    #workflow.add_node("analyze_sentiment", analyze_sentiment)
+    workflow.add_node("retrieve_documents", retrieve_documents)
     workflow.add_node("handle_polandtaxes", handle_polandtaxes)
     workflow.add_node("handle_PCC3", handle_PCC3)
     workflow.add_node("handle_general", handle_general)
     workflow.add_node("escalate", escalate)
-    
-    # Add edges
-    #workflow.add_edge("categorize", "analyze_sentiment")
+
     workflow.add_conditional_edges(
         "categorize",
         route_query,
         {
             "handle_polandtaxes": "handle_polandtaxes",
-            "handle_PCC3": "handle_PCC3",
+            "handle_PCC3": "retrieve_documents",
             "handle_general": "handle_general",
             "escalate": "escalate"
         }
     )
-    
+
+    workflow.add_edge("retrieve_documents", "handle_PCC3")
     workflow.add_edge("handle_polandtaxes", END)
     workflow.add_edge("handle_PCC3", END)
     workflow.add_edge("handle_general", END)
     workflow.add_edge("escalate", END)
-    
+
     workflow.set_entry_point("categorize")
-    
-    app = workflow.compile()
-    return app
+
+    return workflow.compile()
 
 async def run_customer_support(query: str, app) -> str:
     """Process a customer query through the LangGraph workflow."""
